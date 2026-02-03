@@ -9,13 +9,13 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4  # Actualizado a v4
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
       - run: flutter pub get
       - run: flutter build apk --release
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4  # <--- CAMBIO IMPORTANTE (v4)
         with:
           name: app-android
           path: build/app/outputs/flutter-apk/app-release.apk
@@ -24,16 +24,15 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
       - run: flutter pub get
       - run: flutter build windows
-      # Empaquetar el resultado en un ZIP (Windows requiere varios archivos .dll)
       - name: Comprimir Build
         run: Compress-Archive -Path build\windows\runner\Release\* -DestinationPath windows-build.zip
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4  # <--- CAMBIO IMPORTANTE (v4)
         with:
           name: app-windows
           path: windows-build.zip
@@ -42,7 +41,7 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
@@ -50,7 +49,7 @@ jobs:
       - run: flutter build macos --release
       - name: Comprimir App
         run: tar -czf macos-build.tar.gz -C build/macos/Build/Products/Release Matanzas\ Green.app
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4  # <--- CAMBIO IMPORTANTE (v4)
         with:
           name: app-macos
           path: macos-build.tar.gz
