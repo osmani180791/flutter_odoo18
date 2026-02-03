@@ -31,7 +31,7 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows
       - name: Comprimir Build
-        run: Compress-Archive -Path build\windows\runner\Release\* -DestinationPath windows-build.zip
+        run: Compress-Archive -Path build\windows\build\* -DestinationPath windows-build.zip
       - uses: actions/upload-artifact@v4  # <--- CAMBIO IMPORTANTE (v4)
         with:
           name: app-windows
@@ -48,7 +48,7 @@ jobs:
       - run: flutter pub get
       - run: flutter build macos --release
       - name: Comprimir App
-        run: tar -czf macos-build.tar.gz -C build/macos/Build/Products/Release Matanzas\ Green.app
+        run: tar -czf macos-build.tar.gz -C build/macos/Build/odoo.app
       - uses: actions/upload-artifact@v4  # <--- CAMBIO IMPORTANTE (v4)
         with:
           name: app-macos
