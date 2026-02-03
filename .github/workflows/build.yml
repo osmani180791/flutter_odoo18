@@ -9,18 +9,18 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4  # Actualizado a v4
+      - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
       - run: flutter pub get
       - run: flutter build apk --release
-      - uses: actions/upload-artifact@v4  # <--- CAMBIO IMPORTANTE (v4)
+      - uses: actions/upload-artifact@v4
         with:
           name: app-android
           path: build/app/outputs/flutter-apk/app-release.apk
 
-  # TRABAJO 2: WINDOWS (Genera el .exe)
+  # TRABAJO 2: WINDOWS (Ruta x64 corregida)
   build-windows:
     runs-on: windows-latest
     steps:
@@ -31,13 +31,13 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows
       - name: Comprimir Build
-        run: Compress-Archive -Path build\windows\build\* -DestinationPath windows-build.zip
-      - uses: actions/upload-artifact@v4  # <--- CAMBIO IMPORTANTE (v4)
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath windows-build.zip
+      - uses: actions/upload-artifact@v4
         with:
           name: app-windows
           path: windows-build.zip
 
-  # TRABAJO 3: MACOS (Genera la .app)
+  # TRABAJO 3: MACOS (Ruta corregida con comodín *.app)
   build-macos:
     runs-on: macos-latest
     steps:
@@ -48,8 +48,11 @@ jobs:
       - run: flutter pub get
       - run: flutter build macos --release
       - name: Comprimir App
-        run: tar -czf macos-build.tar.gz -C build/macos/Build/odoo.app
-      - uses: actions/upload-artifact@v4  # <--- CAMBIO IMPORTANTE (v4)
+        # TRUCO: Entramos a la carpeta y comprimimos cualquier .app que encontremos
+        run: |
+          cd build/macos/Build/Products/Release
+          tar -czf ../../../../../macos-build.tar.gz *.app
+      - uses: actions/upload-artifact@v4
         with:
           name: app-macos
           path: macos-build.tar.gz
