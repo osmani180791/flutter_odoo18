@@ -1,0 +1,56 @@
+name: Compilar App Multiplataforma
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  # TRABAJO 1: ANDROID
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v3
+        with:
+          name: app-android
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  # TRABAJO 2: WINDOWS (Genera el .exe)
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build windows
+      # Empaquetar el resultado en un ZIP (Windows requiere varios archivos .dll)
+      - name: Comprimir Build
+        run: Compress-Archive -Path build\windows\runner\Release\* -DestinationPath windows-build.zip
+      - uses: actions/upload-artifact@v3
+        with:
+          name: app-windows
+          path: windows-build.zip
+
+  # TRABAJO 3: MACOS (Genera la .app)
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - name: Comprimir App
+        run: tar -czf macos-build.tar.gz -C build/macos/Build/Products/Release Matanzas\ Green.app
+      - uses: actions/upload-artifact@v3
+        with:
+          name: app-macos
+          path: macos-build.tar.gz
