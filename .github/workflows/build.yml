@@ -1,4 +1,66 @@
-# TRABAJO 4: PWA (WEB) - CORREGIDO (Sin web-renderer)
+name: Compilar App Multiplataforma y Web
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # Permite activar manualmente si quieres
+
+permissions:
+  contents: write # Permiso necesario para publicar la web
+
+jobs:
+  # TRABAJO 1: ANDROID
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-android
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  # TRABAJO 2: WINDOWS
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build windows
+      - name: Comprimir Build
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath windows-build.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-windows
+          path: windows-build.zip
+
+  # TRABAJO 3: MACOS
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - name: Comprimir App
+        run: |
+          cd build/macos/Build/Products/Release
+          tar -czf ../../../../../macos-build.tar.gz *.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-macos
+          path: macos-build.tar.gz
+
+  # TRABAJO 4: PWA (WEB) - DESPLIEGUE AUTOMÁTICO
   deploy-web:
     runs-on: ubuntu-latest
     steps:
@@ -8,10 +70,11 @@
           channel: 'stable'
       - run: flutter pub get
       
-      # CORRECCIÓN: Quitamos "--web-renderer html" porque ya no es necesario/compatible
-      # Solo dejamos el base-href
-      - run: flutter build web --release --base-href /flutter_odoo18/
+      # Compilamos para web usando el renderizador HTML para evitar problemas de iconos/imágenes
+      # IMPORTANTE: --base-href "/flutter_odoo18/" es OBLIGATORIO para GitHub Pages
+      - run: flutter build web --release --base-href "/flutter_odoo18/"
 
+      # Publicamos en la rama 'gh-pages'
       - name: Desplegar a GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
