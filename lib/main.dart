@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
+// ¡IMPORTANTE: NO AGREGUES 'import dart:io' AQUÍ NUNCA!
 
 void main() {
   runApp(const MyApp());
@@ -24,7 +25,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ==========================================
-// PANTALLA DE LOGIN (CON ERRORES AMIGABLES)
+// PANTALLA DE LOGIN
 // ==========================================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,7 +35,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // CONFIGURACIÓN DE TU SERVIDOR
   final TextEditingController _urlCtrl = TextEditingController(text: 'https://tu-instancia.odoo.com');
   final TextEditingController _dbCtrl = TextEditingController(text: 'nombre_bd');
   final TextEditingController _userCtrl = TextEditingController(text: 'admin');
@@ -43,25 +43,21 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   Future<void> _login() async {
-    // Ocultar teclado al intentar loguearse
-    FocusScope.of(context).unfocus();
+    // En Web, unfocus puede dar problemas si no se maneja bien, usamos try-catch simple
+    try { FocusScope.of(context).unfocus(); } catch (_) {}
     
     setState(() => _isLoading = true);
     
     try {
-      // 1. Validar URL básica
       if (!_urlCtrl.text.startsWith('http')) {
         throw Exception("La URL debe empezar por http:// o https://");
       }
 
       final client = OdooClient(_urlCtrl.text);
-      
-      // 2. Intentar Autenticación
       await client.authenticate(_dbCtrl.text, _userCtrl.text, _passCtrl.text);
       
       final uid = client.sessionId!.userId;
       
-      // 3. Solicitar Datos de Empresa
       final resUsers = await client.callKw({
         'model': 'res.users',
         'method': 'search_read',
@@ -86,18 +82,20 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
-      // --- MANEJO DE ERRORES MEJORADO ---
+      // --- MANEJO DE ERRORES SEGURO PARA WEB ---
+      // NO usamos 'is SocketException' porque eso requiere dart:io
+      // Usamos strings para detectar el error.
       String mensajeError = "Ocurrió un error desconocido";
       String errorTexto = e.toString();
 
       if (errorTexto.contains("Access Denied") || errorTexto.contains("authentication failed")) {
         mensajeError = "⚠️ Usuario o Contraseña incorrectos";
-      } else if (errorTexto.contains("SocketException") || errorTexto.contains("ClientException") || errorTexto.contains("HandshakeException")) {
-        mensajeError = "🌐 No se puede conectar al servidor.\nRevisa la URL y tu conexión a internet.";
+      } else if (errorTexto.contains("SocketException") || errorTexto.contains("XMLHttpRequest") || errorTexto.contains("ClientException")) {
+        // XMLHttpRequest es el error de conexión en WEB
+        mensajeError = "🌐 Error de conexión.\nSi estás en Web, asegúrate de que tu Odoo tiene HTTPS (candado).";
       } else if (errorTexto.contains("database")) {
-        mensajeError = "🗄️ La Base de Datos no existe o es incorrecta.";
+        mensajeError = "🗄️ La Base de Datos no existe.";
       } else {
-        // Si es otro error, mostramos el detalle técnico pero limpio
         mensajeError = "Error: ${errorTexto.replaceAll('Exception:', '').trim()}";
       }
 
@@ -105,8 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(mensajeError, style: const TextStyle(color: Colors.white)),
           backgroundColor: Colors.red[700],
-          duration: const Duration(seconds: 4),
-          behavior: SnackBarBehavior.floating, // Flotante queda más moderno
+          behavior: SnackBarBehavior.floating,
         ));
       }
     } finally {
@@ -127,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const Icon(Icons.store_mall_directory, size: 80, color: Colors.green),
                 const SizedBox(height: 20),
-                TextField(controller: _urlCtrl, decoration: const InputDecoration(labelText: 'URL Odoo (http/https)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.link))),
+                TextField(controller: _urlCtrl, decoration: const InputDecoration(labelText: 'URL Odoo', border: OutlineInputBorder(), prefixIcon: Icon(Icons.link))),
                 const SizedBox(height: 10),
                 TextField(controller: _dbCtrl, decoration: const InputDecoration(labelText: 'Base de Datos', border: OutlineInputBorder(), prefixIcon: Icon(Icons.storage))),
                 const SizedBox(height: 10),
@@ -135,7 +132,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 10),
                 TextField(controller: _passCtrl, decoration: const InputDecoration(labelText: 'Contraseña', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock)), obscureText: true),
                 const SizedBox(height: 20),
-                
                 _isLoading 
                   ? const CircularProgressIndicator()
                   : SizedBox(
@@ -157,7 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==========================================
-// PANTALLA TIENDA (SIN CAMBIOS, PERO NECESARIA PARA QUE COMPILE)
+// PANTALLA TIENDA
 // ==========================================
 class TiendaScreen extends StatefulWidget {
   final OdooClient client;
@@ -180,7 +176,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
   List<dynamic> _categorias = [];
   bool _cargando = true;
   final Map<int, int> _carrito = {}; 
-  
   int _categoriaSeleccionada = 0; 
   String _busqueda = "";
 
@@ -337,7 +332,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
         ),
         centerTitle: true,
       ),
-
       floatingActionButton: _carrito.isNotEmpty 
         ? FloatingActionButton.extended(
             onPressed: _enviarPedido, 
@@ -347,7 +341,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
             foregroundColor: Colors.white,
           )
         : null,
-      
       body: _cargando 
         ? const Center(child: CircularProgressIndicator()) 
         : Row(
@@ -367,7 +360,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
                   ],
                 ),
               ),
-
               Expanded(
                 child: Container(
                   color: Colors.white,
@@ -386,7 +378,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
                         final producto = listaVisual[i];
                         final id = producto['id'];
                         final cantidad = _carrito[id] ?? 0;
-
                         return Card(
                           elevation: 2,
                           margin: EdgeInsets.zero,
