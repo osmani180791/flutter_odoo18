@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'APP VENTA',
+      title: 'Matanzas Green',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.green,
@@ -24,7 +24,7 @@ class MyApp extends StatelessWidget {
 }
 
 // ==========================================
-// PANTALLA DE LOGIN
+// PANTALLA DE LOGIN (CON ERRORES AMIGABLES)
 // ==========================================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,7 +34,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // AJUSTA ESTOS DATOS A TU SERVIDOR
+  // CONFIGURACIÓN DE TU SERVIDOR
   final TextEditingController _urlCtrl = TextEditingController(text: 'https://tu-instancia.odoo.com');
   final TextEditingController _dbCtrl = TextEditingController(text: 'nombre_bd');
   final TextEditingController _userCtrl = TextEditingController(text: 'admin');
@@ -43,34 +43,70 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
 
   Future<void> _login() async {
+    // Ocultar teclado al intentar loguearse
+    FocusScope.of(context).unfocus();
+    
     setState(() => _isLoading = true);
     
     try {
+      // 1. Validar URL básica
+      if (!_urlCtrl.text.startsWith('http')) {
+        throw Exception("La URL debe empezar por http:// o https://");
+      }
+
       final client = OdooClient(_urlCtrl.text);
+      
+      // 2. Intentar Autenticación
       await client.authenticate(_dbCtrl.text, _userCtrl.text, _passCtrl.text);
       
-      // Obtener el partner_id para poder vender
       final uid = client.sessionId!.userId;
+      
+      // 3. Solicitar Datos de Empresa
       final resUsers = await client.callKw({
         'model': 'res.users',
         'method': 'search_read',
         'args': [[['id', '=', uid]]],
-        'kwargs': {'fields': ['partner_id'], 'limit': 1},
+        'kwargs': {
+          'fields': ['partner_id', 'company_id'], 
+          'limit': 1
+        },
       });
       
       final partnerId = resUsers[0]['partner_id'][0] as int;
+      final companyId = resUsers[0]['company_id'][0] as int;
 
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => TiendaScreen(client: client, partnerId: partnerId)),
+          MaterialPageRoute(builder: (_) => TiendaScreen(
+            client: client, 
+            partnerId: partnerId,
+            companyId: companyId
+          )),
         );
       }
     } catch (e) {
+      // --- MANEJO DE ERRORES MEJORADO ---
+      String mensajeError = "Ocurrió un error desconocido";
+      String errorTexto = e.toString();
+
+      if (errorTexto.contains("Access Denied") || errorTexto.contains("authentication failed")) {
+        mensajeError = "⚠️ Usuario o Contraseña incorrectos";
+      } else if (errorTexto.contains("SocketException") || errorTexto.contains("ClientException") || errorTexto.contains("HandshakeException")) {
+        mensajeError = "🌐 No se puede conectar al servidor.\nRevisa la URL y tu conexión a internet.";
+      } else if (errorTexto.contains("database")) {
+        mensajeError = "🗄️ La Base de Datos no existe o es incorrecta.";
+      } else {
+        // Si es otro error, mostramos el detalle técnico pero limpio
+        mensajeError = "Error: ${errorTexto.replaceAll('Exception:', '').trim()}";
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
+          content: Text(mensajeError, style: const TextStyle(color: Colors.white)),
+          backgroundColor: Colors.red[700],
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating, // Flotante queda más moderno
         ));
       }
     } finally {
@@ -85,18 +121,34 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              TextField(controller: _urlCtrl, decoration: const InputDecoration(labelText: 'URL Odoo')),
-              TextField(controller: _dbCtrl, decoration: const InputDecoration(labelText: 'Base de Datos')),
-              TextField(controller: _userCtrl, decoration: const InputDecoration(labelText: 'Usuario')),
-              TextField(controller: _passCtrl, decoration: const InputDecoration(labelText: 'Contraseña'), obscureText: true),
-              const SizedBox(height: 20),
-              _isLoading 
-                ? const CircularProgressIndicator()
-                : ElevatedButton(onPressed: _login, child: const Text("INGRESAR"))
-            ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.store_mall_directory, size: 80, color: Colors.green),
+                const SizedBox(height: 20),
+                TextField(controller: _urlCtrl, decoration: const InputDecoration(labelText: 'URL Odoo (http/https)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.link))),
+                const SizedBox(height: 10),
+                TextField(controller: _dbCtrl, decoration: const InputDecoration(labelText: 'Base de Datos', border: OutlineInputBorder(), prefixIcon: Icon(Icons.storage))),
+                const SizedBox(height: 10),
+                TextField(controller: _userCtrl, decoration: const InputDecoration(labelText: 'Usuario', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
+                const SizedBox(height: 10),
+                TextField(controller: _passCtrl, decoration: const InputDecoration(labelText: 'Contraseña', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock)), obscureText: true),
+                const SizedBox(height: 20),
+                
+                _isLoading 
+                  ? const CircularProgressIndicator()
+                  : SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                        onPressed: _login, 
+                        child: const Text("INGRESAR", style: TextStyle(fontSize: 18))
+                      ),
+                    )
+              ],
+            ),
           ),
         ),
       ),
@@ -105,13 +157,19 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ==========================================
-// PANTALLA TIENDA (LAYOUT CON BARRA LATERAL + BUSCADOR)
+// PANTALLA TIENDA (SIN CAMBIOS, PERO NECESARIA PARA QUE COMPILE)
 // ==========================================
 class TiendaScreen extends StatefulWidget {
   final OdooClient client;
   final int partnerId;
+  final int companyId; 
 
-  const TiendaScreen({super.key, required this.client, required this.partnerId});
+  const TiendaScreen({
+    super.key, 
+    required this.client, 
+    required this.partnerId,
+    required this.companyId, 
+  });
 
   @override
   State<TiendaScreen> createState() => _TiendaScreenState();
@@ -123,7 +181,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
   bool _cargando = true;
   final Map<int, int> _carrito = {}; 
   
-  // Variables de Filtro
   int _categoriaSeleccionada = 0; 
   String _busqueda = "";
 
@@ -148,7 +205,7 @@ class _TiendaScreenState extends State<TiendaScreen> {
         'args': [[['sale_ok', '=', true]]],
         'kwargs': {
           'fields': ['name', 'list_price', 'id', 'categ_id', 'image_128'],
-          'limit': 200, // Aumentamos límite para ver más cosas
+          'limit': 200,
         },
       });
 
@@ -163,21 +220,16 @@ class _TiendaScreenState extends State<TiendaScreen> {
     }
   }
 
-  // Lógica de filtrado doble (Categoría + Texto)
   List<dynamic> get _productosFiltrados {
     return _productos.where((p) {
-      // 1. Filtro de Categoría
       bool coincideCategoria = true;
       if (_categoriaSeleccionada != 0) {
         coincideCategoria = (p['categ_id'] is List) && (p['categ_id'][0] == _categoriaSeleccionada);
       }
-
-      // 2. Filtro de Búsqueda
       bool coincideTexto = true;
       if (_busqueda.isNotEmpty) {
         coincideTexto = p['name'].toString().toLowerCase().contains(_busqueda.toLowerCase());
       }
-
       return coincideCategoria && coincideTexto;
     }).toList();
   }
@@ -192,24 +244,23 @@ class _TiendaScreenState extends State<TiendaScreen> {
     setState(() => _cargando = true);
     
     try {
-      // Buscar lista de precios por defecto
       final lp = await widget.client.callKw({
           'model': 'product.pricelist', 'method': 'search', 'args': [[]], 'kwargs': {'limit': 1}
       });
       
       final datosPedido = {
         'partner_id': widget.partnerId,
+        'company_id': widget.companyId, 
         'order_line': lineas,
         'state': 'draft',
       };
+      
       if (lp.isNotEmpty) datosPedido['pricelist_id'] = lp[0];
 
-      // 1. Crear
       final idPedido = await widget.client.callKw({
         'model': 'sale.order', 'method': 'create', 'args': [datosPedido], 'kwargs': {}
       });
 
-      // 2. Confirmar
       await widget.client.callKw({
         'model': 'sale.order', 'method': 'action_confirm', 'args': [[idPedido]], 'kwargs': {},
       });
@@ -226,7 +277,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
     }
   }
 
-  // Helper para convertir imagen
   Widget _imagenProducto(dynamic imageField) {
     if (imageField is String && imageField.isNotEmpty) {
       try {
@@ -268,7 +318,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
     final listaVisual = _productosFiltrados;
 
     return Scaffold(
-      // --- BARRA SUPERIOR CON BUSCADOR ---
       appBar: AppBar(
         title: Container(
           height: 40,
@@ -282,7 +331,7 @@ class _TiendaScreenState extends State<TiendaScreen> {
               hintText: "Buscar producto...",
               prefixIcon: Icon(Icons.search, color: Colors.grey),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 10), // Ajuste vertical
+              contentPadding: EdgeInsets.symmetric(vertical: 10),
             ),
           ),
         ),
@@ -304,7 +353,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
         : Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. BARRA LATERAL (CATEGORÍAS)
               Container(
                 width: 130, 
                 color: Colors.grey[200],
@@ -320,7 +368,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
                 ),
               ),
 
-              // 2. GRID DE PRODUCTOS (COMPACTO)
               Expanded(
                 child: Container(
                   color: Colors.white,
@@ -328,7 +375,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
                   ? const Center(child: Text("No se encontraron productos"))
                   : GridView.builder(
                       padding: const EdgeInsets.fromLTRB(10, 10, 10, 80),
-                      // Grid dinámico: Máximo 150px de ancho por tarjeta
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 150, 
                         childAspectRatio: 0.65, 
@@ -347,7 +393,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           child: Column(
                             children: [
-                              // CABECERA (+ / -)
                               Container(
                                 decoration: BoxDecoration(
                                   color: Colors.grey[100],
@@ -378,8 +423,6 @@ class _TiendaScreenState extends State<TiendaScreen> {
                                   ],
                                 ),
                               ),
-                              
-                              // IMAGEN Y DATOS
                               Expanded(
                                 child: Padding(
                                   padding: const EdgeInsets.all(4.0),
