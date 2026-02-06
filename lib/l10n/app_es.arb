@@ -1,0 +1,20 @@
+{
+    "appTitle": "Tienda Odoo",
+    "connectTitle": "Conectar a Odoo",
+    "urlLabel": "URL Odoo",
+    "dbLabel": "Base de Datos",
+    "userLabel": "Usuario",
+    "passLabel": "Contraseña",
+    "loginButton": "INGRESAR",
+    "searchHint": "Buscar producto...",
+    "categoriesTitle": "CATEGORÍAS",
+    "allCategories": "Todas",
+    "confirmButton": "Confirmar",
+    "saleConfirmed": "¡Venta Confirmada!",
+    "errorConnection": "Error de conexión. Revisa HTTPS.",
+    "errorLogin": "Usuario o contraseña incorrectos",
+    "errorDatabase": "La Base de Datos no existe",
+    "errorUnknown": "Error desconocido",
+    "sessionExpired": "Tu sesión ha caducado. Ingresa nuevamente.",
+    "noProducts": "No se encontraron productos"
+}

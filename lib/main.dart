@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:odoo_rpc/odoo_rpc.dart';
-// ¡IMPORTANTE: NO AGREGUES 'import dart:io' AQUÍ NUNCA!
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,12 +14,24 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Matanzas Green',
+      // Título dinámico
+      onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.green,
         useMaterial3: true,
       ),
+      // CONFIGURACIÓN DE IDIOMAS
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es'), // Español
+        Locale('zh'), // Chino
+      ],
       home: const LoginScreen(),
     );
   }
@@ -35,29 +48,33 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _urlCtrl = TextEditingController(text: 'https://tu-instancia.odoo.com');
-  final TextEditingController _dbCtrl = TextEditingController(text: 'nombre_bd');
+  // DATOS DE PRODUCCIÓN
+  final TextEditingController _urlCtrl = TextEditingController(text: 'https://www.merkadocroqueta.com');
+  final TextEditingController _dbCtrl = TextEditingController(text: 'merkadocroqueta');
   final TextEditingController _userCtrl = TextEditingController(text: 'admin');
   final TextEditingController _passCtrl = TextEditingController(text: 'admin');
 
   bool _isLoading = false;
 
   Future<void> _login() async {
-    // En Web, unfocus puede dar problemas si no se maneja bien, usamos try-catch simple
+    final l10n = AppLocalizations.of(context)!; 
     try { FocusScope.of(context).unfocus(); } catch (_) {}
     
     setState(() => _isLoading = true);
     
     try {
       if (!_urlCtrl.text.startsWith('http')) {
-        throw Exception("La URL debe empezar por http:// o https://");
+        throw Exception("URL Error");
       }
 
       final client = OdooClient(_urlCtrl.text);
+      
+      // Intentar Autenticación
       await client.authenticate(_dbCtrl.text, _userCtrl.text, _passCtrl.text);
       
       final uid = client.sessionId!.userId;
       
+      // Solicitar Datos de Empresa
       final resUsers = await client.callKw({
         'model': 'res.users',
         'method': 'search_read',
@@ -82,26 +99,22 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
-      // --- MANEJO DE ERRORES SEGURO PARA WEB ---
-      // NO usamos 'is SocketException' porque eso requiere dart:io
-      // Usamos strings para detectar el error.
-      String mensajeError = "Ocurrió un error desconocido";
       String errorTexto = e.toString();
+      String mensajeMostrar = l10n.errorUnknown;
 
       if (errorTexto.contains("Access Denied") || errorTexto.contains("authentication failed")) {
-        mensajeError = "⚠️ Usuario o Contraseña incorrectos";
+        mensajeMostrar = l10n.errorLogin;
       } else if (errorTexto.contains("SocketException") || errorTexto.contains("XMLHttpRequest") || errorTexto.contains("ClientException")) {
-        // XMLHttpRequest es el error de conexión en WEB
-        mensajeError = "🌐 Error de conexión.\nSi estás en Web, asegúrate de que tu Odoo tiene HTTPS (candado).";
+        mensajeMostrar = l10n.errorConnection;
       } else if (errorTexto.contains("database")) {
-        mensajeError = "🗄️ La Base de Datos no existe.";
+        mensajeMostrar = l10n.errorDatabase;
       } else {
-        mensajeError = "Error: ${errorTexto.replaceAll('Exception:', '').trim()}";
+        mensajeMostrar = "${l10n.errorUnknown}: ${errorTexto.replaceAll('Exception:', '').trim()}";
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(mensajeError, style: const TextStyle(color: Colors.white)),
+          content: Text(mensajeMostrar, style: const TextStyle(color: Colors.white)),
           backgroundColor: Colors.red[700],
           behavior: SnackBarBehavior.floating,
         ));
@@ -113,8 +126,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Usamos una verificación segura para evitar error si l10n aún no cargó
+    final l10n = AppLocalizations.of(context);
+    if (l10n == null) return const CircularProgressIndicator();
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Conectar a Odoo")),
+      appBar: AppBar(title: Text(l10n.connectTitle)),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Center(
@@ -124,14 +141,15 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const Icon(Icons.store_mall_directory, size: 80, color: Colors.green),
                 const SizedBox(height: 20),
-                TextField(controller: _urlCtrl, decoration: const InputDecoration(labelText: 'URL Odoo', border: OutlineInputBorder(), prefixIcon: Icon(Icons.link))),
+                TextField(controller: _urlCtrl, decoration: InputDecoration(labelText: l10n.urlLabel, border: const OutlineInputBorder(), prefixIcon: const Icon(Icons.link))),
                 const SizedBox(height: 10),
-                TextField(controller: _dbCtrl, decoration: const InputDecoration(labelText: 'Base de Datos', border: OutlineInputBorder(), prefixIcon: Icon(Icons.storage))),
+                TextField(controller: _dbCtrl, decoration: InputDecoration(labelText: l10n.dbLabel, border: const OutlineInputBorder(), prefixIcon: const Icon(Icons.storage))),
                 const SizedBox(height: 10),
-                TextField(controller: _userCtrl, decoration: const InputDecoration(labelText: 'Usuario', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person))),
+                TextField(controller: _userCtrl, decoration: InputDecoration(labelText: l10n.userLabel, border: const OutlineInputBorder(), prefixIcon: const Icon(Icons.person))),
                 const SizedBox(height: 10),
-                TextField(controller: _passCtrl, decoration: const InputDecoration(labelText: 'Contraseña', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock)), obscureText: true),
+                TextField(controller: _passCtrl, decoration: InputDecoration(labelText: l10n.passLabel, border: const OutlineInputBorder(), prefixIcon: const Icon(Icons.lock)), obscureText: true),
                 const SizedBox(height: 20),
+                
                 _isLoading 
                   ? const CircularProgressIndicator()
                   : SizedBox(
@@ -140,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                         onPressed: _login, 
-                        child: const Text("INGRESAR", style: TextStyle(fontSize: 18))
+                        child: Text(l10n.loginButton, style: const TextStyle(fontSize: 18))
                       ),
                     )
               ],
@@ -230,6 +248,7 @@ class _TiendaScreenState extends State<TiendaScreen> {
   }
 
   Future<void> _enviarPedido() async {
+    final l10n = AppLocalizations.of(context)!;
     final lineas = <dynamic>[];
     _carrito.forEach((id, cant) {
       if (cant > 0) lineas.add([0, 0, {'product_id': id, 'product_uom_qty': cant}]);
@@ -261,12 +280,11 @@ class _TiendaScreenState extends State<TiendaScreen> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('¡Venta Confirmada!'), backgroundColor: Colors.green)
+        SnackBar(content: Text(l10n.saleConfirmed), backgroundColor: Colors.green)
       );
       setState(() { _carrito.clear(); _cargando = false; });
 
     } catch (e) {
-      print(e);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
       setState(() => _cargando = false);
     }
@@ -310,6 +328,7 @@ class _TiendaScreenState extends State<TiendaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final listaVisual = _productosFiltrados;
 
     return Scaffold(
@@ -322,11 +341,11 @@ class _TiendaScreenState extends State<TiendaScreen> {
           ),
           child: TextField(
             onChanged: (texto) => setState(() => _busqueda = texto),
-            decoration: const InputDecoration(
-              hintText: "Buscar producto...",
-              prefixIcon: Icon(Icons.search, color: Colors.grey),
+            decoration: InputDecoration(
+              hintText: l10n.searchHint,
+              prefixIcon: const Icon(Icons.search, color: Colors.grey),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
         ),
@@ -335,7 +354,7 @@ class _TiendaScreenState extends State<TiendaScreen> {
       floatingActionButton: _carrito.isNotEmpty 
         ? FloatingActionButton.extended(
             onPressed: _enviarPedido, 
-            label: Text("Confirmar (${_carrito.length})"),
+            label: Text("${l10n.confirmButton} (${_carrito.length})"),
             icon: const Icon(Icons.check),
             backgroundColor: Colors.green[700],
             foregroundColor: Colors.white,
@@ -351,11 +370,11 @@ class _TiendaScreenState extends State<TiendaScreen> {
                 color: Colors.grey[200],
                 child: ListView(
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.all(10.0),
-                      child: Text("CATEGORÍAS", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
+                    Padding(
+                      padding: const EdgeInsets.all(10.0),
+                      child: Text(l10n.categoriesTitle, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
-                    _buildCategoryItem(0, "Todas"),
+                    _buildCategoryItem(0, l10n.allCategories),
                     ..._categorias.map((cat) => _buildCategoryItem(cat['id'], cat['name'])),
                   ],
                 ),
@@ -364,7 +383,7 @@ class _TiendaScreenState extends State<TiendaScreen> {
                 child: Container(
                   color: Colors.white,
                   child: listaVisual.isEmpty 
-                  ? const Center(child: Text("No se encontraron productos"))
+                  ? Center(child: Text(l10n.noProducts))
                   : GridView.builder(
                       padding: const EdgeInsets.fromLTRB(10, 10, 10, 80),
                       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
